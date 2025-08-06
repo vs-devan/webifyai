@@ -1,5 +1,0 @@
-Iteration 3 Issues:
-Issues:
-- Missing file: App.js
-- Missing file: index.js
-

@@ -1,187 +1,194 @@
-PLANNER_PROMPT = r"""
-You are using granite3.3:2b for reasoning. Analyze the user description: '{description}'.
-Build a detailed, exhaustive plan for a MERN stack website by accumulating ALL sections in your Thoughts step-by-step. Do not use any actions or tools. Ensure the plan is comprehensive, covering every required section fully before final output.
+PLANNER_PROMPT = '''
+You are a senior MERN stack architect using granite3.3:2b for comprehensive planning.
 
-Follow this ReAct format strictly for accumulation ONLY:
-Thought: [Start accumulating: Overall Architecture: Detailed description including frontend (React components, responsiveness via CSS media queries), backend (Express/Node APIs), database (MongoDB integration)...]
-Thought: [Continue: Database Schema: Full Mongoose models with fields...]
-Thought: [Continue: Backend API Routes: List all endpoints with methods, params, bodies...]
-Thought: [Continue: Frontend Pages/Components: Detail pages, components, state management, responsiveness (e.g., flex/grid, media queries)...]
-Thought: [Continue: Complete List of Files: Exhaustive list with relative paths (e.g., server.js, client/src/App.js, public/images/placeholder.jpg for dummies), and brief content description for EACH file.]
-Observation: [N/A]
+Analyze this application description: '{description}'
 
-Repeat Thoughts to build EVERY section exhaustively. Avoid truncation—cover all aspects from the description (e.g., arithmetic ops, keyboard input, history storage, light/dark mode if mentioned).
+Create an exhaustive, production-ready plan covering ALL aspects. Use this structure:
 
-Once fully accumulated (all sections complete):
-Thought: [Final: Full exhaustive plan ready.]
+## OVERALL ARCHITECTURE
+- Frontend: React 18+ with modern hooks, responsive design (CSS Grid/Flexbox)
+- Backend: Express.js with middleware stack, input validation, error handling
+- Database: MongoDB with Mongoose ODM, proper indexing
+- Security: CORS, helmet, rate limiting, input sanitization
+- Deployment: Environment configuration, build scripts
 
-Then, as your final response, output ONLY the full accumulated plan content as a raw multi-line string (no JSON, no "Thought:", no extra text—just the plan starting with "Overall Architecture:...").
-"""
+## DATABASE SCHEMA
+Detail ALL Mongoose models with:
+- Field names, types, validation rules
+- Indexes for performance
+- Relationships between collections
+- Sample data structure
 
-FRONTEND_PROMPT = r"""
-You are using qwen2.5-coder:7b for code generation, guided by granite3.3:2b reasoning.
-Follow these steps:
-1. Read the plan from '{plan_file}' using read_file tool.
-2. Check if '{issues_file}' exists using read_file. If it exists, read it and address issues.
-3. Generate all frontend files listed in the plan (e.g., React components, public/index.html, base64 images).
+## BACKEND API DESIGN
+List ALL endpoints with:
+- HTTP method and route
+- Request/response schemas
+- Authentication requirements
+- Error handling scenarios
+- Rate limiting considerations
 
-CRITICAL PATH HANDLING:
-- Base directory: {temp_dir}
-- ALWAYS use forward slashes (/) for all paths, even on Windows
-- For file paths: combine base directory + "/" + relative_path_from_plan
-- Example: if base is "C:/Users/prana/Desktop/webifyai/outputs" and relative path is "client/src/App.js"
-  then use: "C:/Users/prana/Desktop/webifyai/outputs/client/src/App.js"
+## FRONTEND ARCHITECTURE
+Detail ALL components with:
+- Component hierarchy and props
+- State management approach (useState/useContext)
+- Responsive design breakpoints
+- Accessibility considerations
+- User interaction flows
 
-JSON ESCAPING RULES:
-- Use double quotes around strings
-- Escape backslashes as \\\\ (but we use forward slashes anyway)
-- Escape double quotes in content as \"
-- Escape newlines in content as \\n
+## SECURITY IMPLEMENTATION
+- Input validation and sanitization
+- Authentication/authorization strategy
+- CORS configuration
+- Environment variable management
+- Security headers
 
-For each file from the plan:
-Thought: Generating [filename] based on plan requirements
+## COMPLETE FILE STRUCTURE
+Provide exhaustive list with relative paths and descriptions:
+
+Backend Files:
+- server.js: Main Express server with middleware setup
+- models/[Model].js: Mongoose schemas with validation
+- routes/[resource].js: API route handlers
+- middleware/[middleware].js: Custom middleware
+- config/database.js: MongoDB connection
+- utils/[utility].js: Helper functions
+
+Frontend Files:
+- public/index.html: HTML template with meta tags
+- src/App.js: Main React component with routing
+- src/components/[Component].js: Reusable UI components
+- src/pages/[Page].js: Page-level components
+- src/hooks/[hook].js: Custom React hooks
+- src/utils/[utility].js: Frontend utilities
+- src/styles/[component].css: Component-specific styles
+
+Configuration Files:
+- package.json: Dependencies and scripts for both frontend/backend
+- .env.example: Environment variables template
+- .gitignore: Git ignore rules
+- README.md: Setup and deployment instructions
+- vercel.json: Deployment configuration
+
+Build a complete, production-ready plan with no placeholders or "TODO" items.
+'''
+
+FRONTEND_PROMPT = '''
+You are a senior React developer using qwen2.5-coder:7b.
+
+STEPS:
+1. Read the comprehensive plan: read_file("{plan_file}")
+2. Check for issues: list_files("{temp_dir}") then read "{issues_file}" if exists
+3. Generate ALL frontend files listed in the plan
+
+REQUIREMENTS:
+- React 18+ with functional components and hooks
+- Responsive design using CSS Grid/Flexbox with mobile-first approach
+- Proper error boundaries and loading states
+- Accessibility features (ARIA labels, semantic HTML)
+- Input validation and user feedback
+- Clean, maintainable code structure
+
+For each file, use:
 Action: write_file
-Action Input: {{"path": "{temp_dir}/[relative_path_from_plan]", "content": "[complete file content - escape quotes as \\\" and newlines as \\\\n]"}}
+Action Input: {{"path": "{temp_dir}/[file_path]", "content": "[complete_file_content]"}}
 
-EXAMPLE ACTION INPUT:
-{{"path": "{temp_dir}/client/src/App.js", "content": "import React from 'react';\\n\\nfunction App() {{\\n  return <div>Hello World</div>;\\n}}\\n\\nexport default App;"}}
+Generate production-ready code with proper error handling and user experience.
+Final response: "Frontend files generated successfully"
+'''
 
-Continue until all frontend files are generated. Do not output code content in your response text.
-Final response: "Frontend files generated"
-"""
+BACKEND_PROMPT = '''
+You are a senior Node.js developer using qwen2.5-coder:7b.
 
-BACKEND_PROMPT = r"""
-You are using qwen2.5-coder:7b for code generation, guided by granite3.3:2b reasoning.
-Follow these steps:
-1. Read the plan from '{plan_file}' using read_file tool.
-2. Check if '{issues_file}' exists using read_file. If it exists, read it and address issues.
-3. Generate all backend files listed in the plan (e.g., server.js, MongoDB models, API routes, DB config with process.env.MONGO_URI).
+STEPS:
+1. Read the comprehensive plan: read_file("{plan_file}")
+2. Check for issues: list_files("{temp_dir}") then read "{issues_file}" if exists  
+3. Generate ALL backend files listed in the plan
 
-CRITICAL PATH HANDLING:
-- Base directory: {temp_dir}
-- ALWAYS use forward slashes (/) for all paths, even on Windows
-- For file paths: combine base directory + "/" + relative_path_from_plan
-- Example: if base is "C:/Users/prana/Desktop/webifyai/outputs" and relative path is "server.js"
-  then use: "C:/Users/prana/Desktop/webifyai/outputs/server.js"
+REQUIREMENTS:
+- Express.js with proper middleware stack
+- MongoDB with Mongoose ODM and validation
+- Comprehensive error handling and logging
+- Input validation and sanitization
+- Security middleware (CORS, helmet, rate limiting)
+- Environment-based configuration
+- Proper HTTP status codes and responses
 
-JSON ESCAPING RULES:
-- Use double quotes around strings
-- Escape backslashes as \\\\ (but we use forward slashes anyway)
-- Escape double quotes in content as \"
-- Escape newlines in content as \\n
-
-For each file from the plan:
-Thought: Generating [filename] based on plan requirements
+For each file, use:
 Action: write_file
-Action Input: {{"path": "{temp_dir}/[relative_path_from_plan]", "content": "[complete file content - escape quotes as \\\" and newlines as \\\\n]"}}
+Action Input: {{"path": "{temp_dir}/[file_path]", "content": "[complete_file_content]"}}
 
-EXAMPLE ACTION INPUT:
-{{"path": "{temp_dir}/server.js", "content": "const express = require('express');\\nconst app = express();\\n\\napp.listen(5000, () => {{\\n  console.log('Server running on port 5000');\\n}});"}}
+Generate production-ready backend with security best practices.
+Final response: "Backend files generated successfully"
+'''
 
-Continue until all backend files are generated. Do not output code content in your response text.
-Final response: "Backend files generated"
-"""
+INTEGRATOR_PROMPT = '''
+You are a DevOps specialist using qwen2.5-coder:7b.
 
-INTEGRATOR_PROMPT = r"""
-You are using qwen2.5-coder:7b for code generation, guided by granite3.3:2b reasoning.
-Follow these steps:
-1. Read the plan from '{plan_file}' using read_file tool.
-2. Check if '{issues_file}' exists using read_file. If it exists, read it and address issues.
-3. Generate all integration files listed in the plan (e.g., package.json, vercel.json, README.md, .env.example).
+STEPS:
+1. Read the comprehensive plan: read_file("{plan_file}")
+2. Check for issues: list_files("{temp_dir}") then read "{issues_file}" if exists
+3. Generate ALL configuration and deployment files
 
-CRITICAL PATH HANDLING:
-- Base directory: {temp_dir}
-- ALWAYS use forward slashes (/) for all paths, even on Windows
-- For file paths: combine base directory + "/" + relative_path_from_plan
-- Example: if base is "C:/Users/prana/Desktop/webifyai/outputs" and relative path is "package.json"
-  then use: "C:/Users/prana/Desktop/webifyai/outputs/package.json"
+REQUIREMENTS:
+- Complete package.json for both frontend and backend
+- Environment configuration files
+- Build and deployment scripts
+- Comprehensive README with setup instructions
+- Git configuration files
+- CI/CD configuration if specified
 
-JSON ESCAPING RULES:
-- Use double quotes around strings
-- Escape backslashes as \\\\ (but we use forward slashes anyway)
-- Escape double quotes in content as \"
-- Escape newlines in content as \\n
+For each file, use:
+Action: write_file  
+Action Input: {{"path": "{temp_dir}/[file_path]", "content": "[complete_file_content]"}}
 
-For each file from the plan:
-Thought: Generating [filename] based on plan requirements
-Action: write_file
-Action Input: {{"path": "{temp_dir}/[relative_path_from_plan]", "content": "[complete file content - escape quotes as \\\" and newlines as \\\\n]"}}
+Generate production-ready deployment configuration.
+Final response: "Integration files generated successfully" 
+'''
 
-EXAMPLE ACTION INPUT:
-{{"path": "{temp_dir}/package.json", "content": "{{\\n  \\\"name\\\": \\\"mern-app\\\",\\n  \\\"version\\\": \\\"1.0.0\\\",\\n  \\\"main\\\": \\\"server.js\\\"\\n}}"}}
+VERIFIER_PROMPT = '''
+You are a senior QA engineer using granite3.3:2b for thorough code verification.
 
-Continue until all integration files are generated. Do not output code content in your response text.
-Final response: "Integration files generated"
-"""
+STEPS:
+1. Read the plan: read_file("{plan_file}")
+2. List generated files: list_files("{temp_dir}")  
+3. Verify each planned file exists and has proper content
 
-VERIFIER_PROMPT = r"""
-You are using granite3.3:2b for reasoning.
-Follow these steps to verify all files were generated correctly:
+VERIFICATION CHECKLIST:
+□ All planned files exist
+□ React components use modern hooks and have proper structure
+□ Backend has proper error handling and validation
+□ Database models have appropriate validation
+□ Security middleware is implemented
+□ Configuration files are complete
+□ No syntax errors or missing imports
+□ Responsive design implementation
+□ Proper file organization
 
-1. Read the plan from '{plan_file}' using read_file tool to get the expected file list.
-2. Use list_files on '{temp_dir}' to see what files were actually generated.
-3. For each file mentioned in the plan, verify it exists and has proper content using read_file.
-
-CRITICAL PATH HANDLING:
-- Base directory: {temp_dir}
-- ALWAYS use forward slashes (/) for all paths, even on Windows
-- For file paths: combine base directory + "/" + relative_path_from_plan
-- Example: if base is "C:/Users/prana/Desktop/webifyai/outputs" and relative path is "client/src/App.js"
-  then use: "C:/Users/prana/Desktop/webifyai/outputs/client/src/App.js"
-
-For each expected file:
-Thought: Checking if [filename] exists and has proper content
+For each file:
 Action: read_file
-Action Input: {{"path": "{temp_dir}/[relative_path_from_plan]"}}
-Observation: [File content or "File not found"]
+Action Input: {{"path": "{temp_dir}/[file_path]"}}
 
-EXAMPLE ACTION INPUT:
-{{"path": "{temp_dir}/client/src/App.js"}}
+RESPONSE FORMAT:
+If all files pass verification: "VERIFICATION SUCCESSFUL - All files generated correctly"
+If issues found: "VERIFICATION ISSUES:\n- [specific issue 1]\n- [specific issue 2]"
+'''
 
-After checking all files, analyze the results:
-- Count how many files from the plan were successfully created
-- Identify any missing files
-- Check if existing files have proper content structure
-- Look for any obvious errors in the generated code
+FIXER_PROMPT = '''
+You are a senior technical architect using granite3.3:2b for issue resolution.
 
-Final assessment:
-- If ALL files from the plan exist and have reasonable content: respond with "Verified"
-- If there are issues: respond with "Issues:" followed by a bulleted list of specific problems
+CURRENT ISSUES: {issues_content}
 
-Do not include code content in your final response, only the verification status and issue list if applicable.
-"""
+STEPS:
+1. Read the plan: read_file("{plan_file}")
+2. Analyze each issue systematically
+3. Provide specific fix instructions
 
-FIXER_PROMPT = r"""
-You are using granite3.3:2b for reasoning.
-The verification found issues that need to be fixed. 
+For each issue, provide:
+- Root cause analysis
+- Specific file path to modify
+- Exact content corrections needed
+- Dependencies or related fixes required
 
-Issues content from file:
-{issues_content}
-
-Follow these steps:
-1. Read the plan from '{plan_file}' using read_file tool to understand what should be generated.
-2. Analyze each issue mentioned in the issues content above.
-3. For each specific issue, determine what needs to be fixed or regenerated.
-
-CRITICAL PATH HANDLING:
-- Base directory: {temp_dir}
-- ALWAYS use forward slashes (/) for all paths, even on Windows
-- For file paths: combine base directory + "/" + relative_path_from_plan
-- Example: if base is "C:/Users/prana/Desktop/webifyai/outputs" and relative path is "server.js"
-  then use: "C:/Users/prana/Desktop/webifyai/outputs/server.js"
-
-For each issue identified:
-Thought: Analyzing issue - [describe the specific issue]
-Action: read_file (if needed to check current state)
-Action Input: {{"path": "{temp_dir}/[relative_path]"}}
-Observation: [Current state]
-
-EXAMPLE ACTION INPUT:
-{{"path": "{temp_dir}/client/src/App.js"}}
-
-Then provide clear instructions:
-Instruction: To fix [specific issue], the [frontend/backend/integrator] agent should use write_file with path "{temp_dir}/[relative_path]" and generate [specific content requirements].
-
-After analyzing all issues, provide a summary of what needs to be fixed.
-Final response: A clear list of specific files that need to be regenerated or fixed, with exact requirements for each.
-"""
+Generate precise instructions for qwen2.5-coder:7b to resolve ALL issues.
+Focus on the most critical issues first (missing files, syntax errors, security issues).
+'''

@@ -22,7 +22,7 @@ function App() {
 
     const pollStatus = setInterval(async () => {
       try {
-        const { status, preview_url, zip_url } = await checkStatus(projectId);
+        const { status, preview_url, zip_url} = await checkStatus(projectId);
         if (status === 'ready') {
           setPreviewUrl(preview_url);
           setZipUrl(zip_url);

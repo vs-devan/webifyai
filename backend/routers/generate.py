@@ -39,7 +39,7 @@ async def preview_site(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found")
     
     preview_url = start_preview(project_id, project["file_paths"])
-    return {"preview_url": preview_url}
+    return {"preview_url": preview_url, "status":"ready"}
 
 @router.get("/download/{project_id}")
 async def download_site(project_id: str):

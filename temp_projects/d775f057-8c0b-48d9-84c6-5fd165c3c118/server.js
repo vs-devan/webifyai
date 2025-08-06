@@ -1,4 +1,0 @@
-const express = require("express");
-const app = express();
-app.get("/", (req, res) => res.send("Generated Backend"));
-app.listen(4000);

@@ -11,8 +11,8 @@ const InputForm = ({ onGenerate }) => {
     setLoading(true);
     setError(null);
     try {
-      const { project_id } = await generateProject(description);
-      onGenerate(project_id); // Pass project_id to parent for polling
+      const { id } = await generateProject(description);
+      onGenerate(id); // Pass project_id to parent for polling
     } catch (err) {
       setError(err.message);
     } finally {

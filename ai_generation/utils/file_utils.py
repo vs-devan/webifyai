@@ -2,8 +2,10 @@ import os
 import json
 import base64
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 import logging
+import re
+from datetime import datetime   
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +14,14 @@ def collect_files(temp_dir: str, exclude_files: Optional[List[str]] = None) -> D
     Enhanced file collection with better error handling and filtering.
     
     Args:
-        temp_dir: Directory to collect files from
-        exclude_files: List of files to exclude (defaults to plan.txt, issues.txt)
+        temp_dir: Directory to collect files from (current: outputs/)
+        exclude_files: List of files to exclude (defaults to plan.txt, generation.log, files.json, summaries)
     
     Returns:
-        Dictionary mapping relative paths to file contents
+        Dictionary mapping relative paths to file contents (only final code files)
     """
     if exclude_files is None:
-        exclude_files = ['plan.txt', 'issues.txt', 'generation.log']
+        exclude_files = ['plan.txt', 'generation.log', 'files.json', 'global_summary.txt']
     
     files = {}
     temp_path = Path(temp_dir)
@@ -30,12 +32,14 @@ def collect_files(temp_dir: str, exclude_files: Optional[List[str]] = None) -> D
     
     try:
         for root, dirs, filenames in os.walk(temp_path):
-            # Skip hidden directories and common non-source directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', '.git']]
+            # Skip hidden directories, non-source dirs, and pseudo_files dir
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', '.git', 'pseudo_files']]
             
             for filename in filenames:
-                # Skip excluded files and hidden files
-                if filename in exclude_files or filename.startswith('.'):
+                # Skip excluded files, hidden files, and summary batches
+                if (filename in exclude_files or 
+                    filename.startswith('.') or 
+                    filename.startswith('summary_batch') and filename.endswith('.txt')):
                     continue
                 
                 full_path = Path(root) / filename
@@ -103,7 +107,7 @@ def _read_text_file(filepath: Path, encodings: List[str] = None) -> Optional[str
 def create_file_manifest(files_dict: Dict[str, str], output_path: Optional[str] = None) -> Dict:
     """Create a manifest of generated files with metadata."""
     manifest = {
-        "generated_at": str(Path().cwd()),
+        "generated_at": str(datetime.now()),
         "total_files": len(files_dict),
         "files": {}
     }
@@ -133,41 +137,23 @@ def create_file_manifest(files_dict: Dict[str, str], output_path: Optional[str] 
     return manifest
 
 def _classify_file_type(filepath: str) -> str:
-    """Classify file type based on path and extension."""
-    path = Path(filepath)
-    ext = path.suffix.lower()
-    
-    # Configuration files
-    if path.name in ['package.json', '.env', '.env.example', 'vercel.json', 'docker-compose.yml']:
-        return 'configuration'
-    
-    # Documentation
-    if ext in ['.md', '.txt'] or 'readme' in path.name.lower():
-        return 'documentation'
-    
-    # Frontend files
-    if ext in ['.js', '.jsx', '.ts', '.tsx'] and any(part in str(path) for part in ['src', 'components', 'pages', 'hooks']):
-        return 'frontend'
-    
-    # Backend files
-    if ext in ['.js', '.ts'] and any(part in str(path) for part in ['server', 'routes', 'models', 'middleware', 'controllers']):
+    path = Path(filepath).as_posix().lower()
+    if any(ind in path for ind in ['package.json', '.env', '.gitignore', 'readme.md']):
+        return 'config'
+    if any(ind in path for ind in ['server.js', 'models/', 'routes/', 'middleware/']):
         return 'backend'
-    
-    # Styles
-    if ext in ['.css', '.scss', '.sass', '.less']:
-        return 'styles'
-    
-    # Static assets
-    if ext in ['.html', '.htm']:
-        return 'template'
-    
-    if _is_image_file(path.name):
+    if any(ind in path for ind in ['src/', 'components/', 'hooks/', 'styles/']):
+        return 'frontend'
+    if path.endswith(('.css', '.scss', '.sass', '.less')):
+        return 'frontend'
+    if path.endswith(('.md', '.txt')):
+        return 'config'
+    if _is_image_file(path):
         return 'image'
-    
     return 'other'
 
 def validate_file_structure(files_dict: Dict[str, str]) -> Dict[str, List[str]]:
-    """Validate the generated file structure for common issues."""
+    """Validate the generated file structure for common issues (adapted to current pipeline)."""
     issues = {
         "errors": [],
         "warnings": [],
@@ -181,33 +167,48 @@ def validate_file_structure(files_dict: Dict[str, str]) -> Dict[str, List[str]]:
             issues["errors"].append(f"Missing required file: {req_file}")
     
     # Check for React app structure
-    react_indicators = ['App.js', 'App.jsx', 'index.js', 'index.jsx']
-    if not any(indicator in ''.join(files_dict.keys()) for indicator in react_indicators):
+    react_indicators = ['app.js', 'app.jsx', 'index.js', 'index.jsx']
+    if not any(ind in path.lower() for path in files_dict.keys() for ind in react_indicators):
         issues["warnings"].append("No obvious React entry point found")
     
     # Check for Express server
     server_indicators = ['server.js', 'app.js', 'index.js']
     has_server = any(
-        indicator in path and any(backend_term in files_dict[path].lower() 
-                                for backend_term in ['express', 'app.listen', 'server'])
+        ind in path.lower() and any(term in files_dict[path].lower() 
+                                    for term in ['express', 'app.listen', 'server'])
         for path in files_dict.keys() 
-        for indicator in server_indicators
+        for ind in server_indicators
     )
     
     if not has_server:
         issues["warnings"].append("No obvious Express server file found")
     
-    # Check package.json validity
-    package_files = [path for path in files_dict.keys() if 'package.json' in path]
+# Check package.json validity - be more lenient
+# In validate_file_structure method, update the package.json validation:
+# Check package.json validity - be more lenient
+    package_files = [path for path in files_dict.keys() if 'package.json' in path.lower()]
     for pkg_file in package_files:
         try:
-            pkg_data = json.loads(files_dict[pkg_file])
-            if 'name' not in pkg_data:
-                issues["warnings"].append(f"package.json missing 'name' field: {pkg_file}")
-            if 'dependencies' not in pkg_data and 'devDependencies' not in pkg_data:
-                issues["warnings"].append(f"package.json has no dependencies: {pkg_file}")
-        except json.JSONDecodeError:
-            issues["errors"].append(f"Invalid JSON in package.json: {pkg_file}")
+            content = files_dict[pkg_file].strip()
+            
+            # For JSON files, ensure they start and end with braces
+            if not (content.startswith('{') and content.endswith('}')):
+                issues["errors"].append(f"Invalid JSON structure in {pkg_file}")
+                continue
+                
+            # Try to find the JSON object
+            try:
+                pkg_data = json.loads(content)
+                if 'name' not in pkg_data:
+                    issues["warnings"].append(f"package.json missing 'name' field: {pkg_file}")
+                if 'dependencies' not in pkg_data and 'devDependencies' not in pkg_data:
+                    issues["warnings"].append(f"package.json has no dependencies: {pkg_file}")
+            except json.JSONDecodeError as e:
+                issues["errors"].append(f"Invalid JSON in {pkg_file}: {str(e)}")
+                
+        except Exception as e:
+            issues["warnings"].append(f"Could not process {pkg_file}: {str(e)}")
+    
     
     # File size checks
     for filepath, content in files_dict.items():
@@ -219,14 +220,17 @@ def validate_file_structure(files_dict: Dict[str, str]) -> Dict[str, List[str]]:
         elif size > 1024 * 1024:  # Files over 1MB
             issues["warnings"].append(f"Large file detected: {filepath} ({size:,} bytes)")
     
-    # Security checks
+    # Security checks (adapted for current best practices)
+# In validate_file_structure method, update security_patterns:
     security_patterns = {
-        'hardcoded_secrets': [r'password.*=.*["\'][^"\']{8,}["\']', r'api[_-]?key.*=.*["\'][^"\']+["\']'],
+        'hardcoded_secrets': [
+            r'password\s*=\s*["\'][^"\']{12,}["\']',  # Only flag long passwords
+            r'api[_-]?key\s*=\s*["\'][a-zA-Z0-9]{20,}["\']'  # Only flag actual API keys
+        ],
         'sql_injection_risk': [r'SELECT.*\+.*', r'query.*\+.*'],
         'xss_risk': [r'innerHTML.*=.*[^)]+\)', r'dangerouslySetInnerHTML']
     }
     
-    import re
     for filepath, content in files_dict.items():
         if isinstance(content, str):
             for risk_type, patterns in security_patterns.items():
@@ -236,3 +240,21 @@ def validate_file_structure(files_dict: Dict[str, str]) -> Dict[str, List[str]]:
                         break
     
     return issues
+
+def validate_description(description: str) -> Dict:
+    """Validate user input description."""
+    errors = []
+    warnings = []
+    
+    if not description or not description.strip():
+        errors.append("Description cannot be empty")
+    elif len(description.strip()) < 20:
+        errors.append("Description too short (minimum 20 characters)")
+    elif len(description) > 5000:
+        warnings.append("Very long description may impact performance")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings
+    }

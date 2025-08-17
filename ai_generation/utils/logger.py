@@ -26,7 +26,7 @@ def setup_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     logger.addHandler(console_handler)
     
     # File handler
-    log_file = Path("outputs/generation.log")
+    log_file = Path("working/generation.log")
     log_file.parent.mkdir(exist_ok=True)
     
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
